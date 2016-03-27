@@ -21,15 +21,26 @@ var (
 		return gzip.NewWriter(nil)
 	}}
 
-	gzippableMinSize = 1400
+	gzippableMinSize = 150
 
-	gzippableTypes = map[string]struct{}{
-		"text/xml":               {},
-		"application/postscript": {},
-		"text/plain":             {},
-		"image/bmp":              {},
-		"audio/wave":             {},
-		"text/html":              {},
+	notGzippableTypes = map[string]struct{}{
+		"application/font-woff": {},
+		"application/gzip":      {},
+		"application/pdf":       {},
+		"application/zip":       {},
+		"audio/mp4":             {},
+		"audio/mpeg":            {},
+		"audio/webm":            {},
+		"image/gif":             {},
+		"image/jpeg":            {},
+		"image/png":             {},
+		"image/webp":            {},
+		"video/h264":            {},
+		"video/mp4":             {},
+		"video/mpeg":            {},
+		"video/ogg":             {},
+		"video/vp8":             {},
+		"video/webm":            {},
 	}
 )
 
@@ -142,6 +153,6 @@ func isGzippable(ct string, cl int) bool {
 		return false
 	}
 
-	_, ok := gzippableTypes[strings.SplitN(ct, ";", 2)[0]]
-	return ok
+	_, ok := notGzippableTypes[strings.ToLower(strings.SplitN(ct, ";", 2)[0])]
+	return !ok
 }
