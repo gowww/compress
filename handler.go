@@ -33,12 +33,12 @@ var (
 	}
 )
 
-// An Handler responds to an HTTP request with a compressed content.
+// An Handler provides a clever gzip compressing handler.
 type Handler struct {
 	Next http.Handler
 }
 
-// Handle returns a Handler wrapping another Handler.
+// Handle returns a Handler wrapping another http.Handler.
 func Handle(h http.Handler) *Handler {
 	return &Handler{h}
 }
