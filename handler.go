@@ -77,9 +77,9 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 // compressWriter binds the downstream repsonse writing into gzipWriter if the first content is detected as gzippable.
 // gzipUse keeps this detection result:
-//	-1	detected but not used
-// 	0	not detected yet
-// 	1	detected and used
+//	-1	detection done && gzip not used
+// 	0	detection not done
+// 	1	detection done && gzip used
 type compressWriter struct {
 	http.ResponseWriter
 	gzipWriter *gzip.Writer
