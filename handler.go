@@ -67,24 +67,24 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	cw := &compressWriter{
 		ResponseWriter: w,
-		gziWriter:      gzipPool.Get().(*gzip.Writer),
+		gzipWriter:     gzipPool.Get().(*gzip.Writer),
 	}
-	defer gzipPool.Put(cw.gziWriter)
+	defer gzipPool.Put(cw.gzipWriter)
 	defer cw.close()
 
 	h.Next.ServeHTTP(cw, r)
 }
 
-// compressWriter binds the downstream repsonse writing into gziWriter if the first content is detected as gzip compressible.
+// compressWriter binds the downstream repsonse writing into gzipWriter if the first content is detected as gzippable.
 // gzipUse keeps this detection result:
 //	-1	detected but not used
 // 	0	not detected yet
 // 	1	detected and used
 type compressWriter struct {
 	http.ResponseWriter
-	gziWriter *gzip.Writer
-	gzipUse   int
-	status    int
+	gzipWriter *gzip.Writer
+	gzipUse    int
+	status     int
 }
 
 // WriteHeader catches a downstream WriteHeader call and caches the status code.
@@ -119,7 +119,7 @@ func (cw *compressWriter) Write(b []byte) (int, error) {
 		if isGzippable(ct, cl) {
 			cw.gzipUse = 1
 			cw.setGzipHeaders()
-			cw.gziWriter.Reset(cw.ResponseWriter)
+			cw.gzipWriter.Reset(cw.ResponseWriter)
 		} else {
 			cw.gzipUse = -1
 		}
@@ -128,7 +128,7 @@ func (cw *compressWriter) Write(b []byte) (int, error) {
 	}
 
 	if cw.gzipUse == 1 {
-		return cw.gziWriter.Write(b)
+		return cw.gzipWriter.Write(b)
 	}
 	return cw.ResponseWriter.Write(b)
 }
@@ -136,7 +136,7 @@ func (cw *compressWriter) Write(b []byte) (int, error) {
 // close closes the gzip writer if it has been used.
 func (cw *compressWriter) close() {
 	if cw.gzipUse == 1 {
-		cw.gziWriter.Close()
+		cw.gzipWriter.Close()
 	}
 }
 
