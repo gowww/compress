@@ -17,9 +17,7 @@ import (
 )
 
 var (
-	gzipPool = sync.Pool{New: func() interface{} {
-		return gzip.NewWriter(nil)
-	}}
+	gzipPool = sync.Pool{New: func() interface{} { return gzip.NewWriter(nil) }}
 
 	gzippableMinSize = 1400
 
@@ -60,6 +58,8 @@ func HandleFunc(f http.HandlerFunc) *Handler {
 }
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	w.Header().Add("Vary", "Accept-Encoding")
+
 	if !strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") || r.Header.Get("Sec-WebSocket-Key") != "" {
 		h.Next.ServeHTTP(w, r)
 		return
@@ -105,18 +105,18 @@ func (cw *compressWriter) writePostponedHeader() {
 // Otherwise, it calls the original Write method.
 func (cw *compressWriter) Write(b []byte) (int, error) {
 	if cw.gzipUse == 0 {
+		cl, _ := strconv.Atoi(cw.ResponseWriter.Header().Get("Content-Length"))
+		if cl < 1 {
+			cl = len(b) // If no Content-Length, take the length of this first chunk.
+		}
+
 		ct := cw.ResponseWriter.Header().Get("Content-Type")
 		if ct == "" {
 			ct = http.DetectContentType(b)
 			cw.ResponseWriter.Header().Set("Content-Type", ct)
 		}
 
-		cl, _ := strconv.Atoi(cw.ResponseWriter.Header().Get("Content-Length"))
-		if cl < 1 {
-			cl = len(b) // If no Content-Length, take the length of this first chunk.
-		}
-
-		if isGzippable(ct, cl) {
+		if isGzippable(cl, ct) {
 			cw.gzipUse = 1
 			cw.setGzipHeaders()
 			cw.gzipWriter.Reset(cw.ResponseWriter)
@@ -148,7 +148,7 @@ func (cw *compressWriter) setGzipHeaders() {
 }
 
 // isGzippable checks if a content must be compressed following its content length (cl) and content type (ct).
-func isGzippable(ct string, cl int) bool {
+func isGzippable(cl int, ct string) bool {
 	if cl < gzippableMinSize || ct == "" {
 		return false
 	}
