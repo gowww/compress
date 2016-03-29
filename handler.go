@@ -21,7 +21,7 @@ var (
 		return gzip.NewWriter(nil)
 	}}
 
-	gzippableMinSize = 150
+	gzippableMinSize = 1400
 
 	notGzippableTypes = map[string]struct{}{
 		"application/font-woff": {},
