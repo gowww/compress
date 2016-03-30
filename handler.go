@@ -147,6 +147,10 @@ func isGzippable(cl int, ct string) bool {
 		return false
 	}
 
-	_, ok := notGzippableTypes[strings.ToLower(strings.SplitN(ct, ";", 2)[0])]
+	if i := strings.IndexByte(ct, ';'); i >= 0 {
+		ct = ct[:i]
+	}
+	ct = strings.ToLower(ct)
+	_, ok := notGzippableTypes[ct]
 	return !ok
 }
