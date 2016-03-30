@@ -16,31 +16,29 @@ import (
 	"sync"
 )
 
-var (
-	gzipPool = sync.Pool{New: func() interface{} { return gzip.NewWriter(nil) }}
+const gzippableMinSize = 1400
 
-	gzippableMinSize = 1400
+var gzipPool = sync.Pool{New: func() interface{} { return gzip.NewWriter(nil) }}
 
-	notGzippableTypes = map[string]struct{}{
-		"application/font-woff": {},
-		"application/gzip":      {},
-		"application/pdf":       {},
-		"application/zip":       {},
-		"audio/mp4":             {},
-		"audio/mpeg":            {},
-		"audio/webm":            {},
-		"image/gif":             {},
-		"image/jpeg":            {},
-		"image/png":             {},
-		"image/webp":            {},
-		"video/h264":            {},
-		"video/mp4":             {},
-		"video/mpeg":            {},
-		"video/ogg":             {},
-		"video/vp8":             {},
-		"video/webm":            {},
-	}
-)
+var notGzippableTypes = map[string]struct{}{
+	"application/font-woff": {},
+	"application/gzip":      {},
+	"application/pdf":       {},
+	"application/zip":       {},
+	"audio/mp4":             {},
+	"audio/mpeg":            {},
+	"audio/webm":            {},
+	"image/gif":             {},
+	"image/jpeg":            {},
+	"image/png":             {},
+	"image/webp":            {},
+	"video/h264":            {},
+	"video/mp4":             {},
+	"video/mpeg":            {},
+	"video/ogg":             {},
+	"video/vp8":             {},
+	"video/webm":            {},
+}
 
 // An Handler provides a clever gzip compressing handler.
 type Handler struct {
@@ -76,19 +74,16 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 // compressWriter binds the downstream repsonse writing into gzipWriter if the first content is detected as gzippable.
-// gzipUse keeps this detection result:
-//	-1	detection done && gzip not used
-// 	0	detection not done
-// 	1	detection done && gzip used
 type compressWriter struct {
 	http.ResponseWriter
 	gzipWriter *gzip.Writer
-	gzipUse    int
+	gzipDetect bool // gzipDetect tells if the gzippable detection has been done.
+	gzipUse    bool // gzipUse tells if gzip is used for the response.
 	status     int
 }
 
 // WriteHeader catches a downstream WriteHeader call and caches the status code.
-// The header will be written later, on the first Write call and after all the headers has been correctly set.
+// The header will be written later, at the first Write call, after the gzipping detection has been done.
 func (cw *compressWriter) WriteHeader(status int) {
 	cw.status = status
 }
@@ -104,7 +99,7 @@ func (cw *compressWriter) writePostponedHeader() {
 // Write sets the compressing headers and calls the gzip writer, but only if the Content-Type header defines a compressible content.
 // Otherwise, it calls the original Write method.
 func (cw *compressWriter) Write(b []byte) (int, error) {
-	if cw.gzipUse == 0 {
+	if !cw.gzipDetect {
 		cl, _ := strconv.Atoi(cw.ResponseWriter.Header().Get("Content-Length"))
 		if cl < 1 {
 			cl = len(b) // If no Content-Length, take the length of this first chunk.
@@ -117,17 +112,16 @@ func (cw *compressWriter) Write(b []byte) (int, error) {
 		}
 
 		if isGzippable(cl, ct) {
-			cw.gzipUse = 1
+			cw.gzipUse = true
 			cw.setGzipHeaders()
 			cw.gzipWriter.Reset(cw.ResponseWriter)
-		} else {
-			cw.gzipUse = -1
 		}
 
 		cw.writePostponedHeader()
+		cw.gzipDetect = true
 	}
 
-	if cw.gzipUse == 1 {
+	if cw.gzipUse {
 		return cw.gzipWriter.Write(b)
 	}
 	return cw.ResponseWriter.Write(b)
@@ -135,7 +129,7 @@ func (cw *compressWriter) Write(b []byte) (int, error) {
 
 // close closes the gzip writer if it has been used.
 func (cw *compressWriter) close() {
-	if cw.gzipUse == 1 {
+	if cw.gzipUse {
 		cw.gzipWriter.Close()
 	}
 }
