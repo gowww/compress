@@ -101,7 +101,7 @@ func (cw *compressWriter) writePostponedHeader() {
 func (cw *compressWriter) Write(b []byte) (int, error) {
 	if !cw.gzipDetect {
 		cl, _ := strconv.Atoi(cw.ResponseWriter.Header().Get("Content-Length"))
-		if cl >= 0 {
+		if cl <= 0 {
 			cl = len(b) // If no Content-Length, take the length of this first chunk.
 		}
 
