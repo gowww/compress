@@ -16,10 +16,18 @@ import (
 	"sync"
 )
 
+// gzippableMinSize is the minimal size (in bytes) a content needs to have to be gzipped.
+//
+// A TCP packet is normally 1500 bytes long.
+// So if the response plus the TCP headers already fits into a single packet, there will be no gain from gzip.
 const gzippableMinSize = 1400
 
-var gzipPool = sync.Pool{New: func() interface{} { return gzip.NewWriter(nil) }}
-
+// notGzippableTypes is a custom list of media types referring to a compressed content.
+// Gzip will not be applied to any of these content types.
+//
+// For performance, only the most common officials (and future officials) are listed.
+//
+// All official media types: http://www.iana.org/assignments/media-types/media-types.xhtml
 var notGzippableTypes = map[string]struct{}{
 	"application/font-woff": {},
 	"application/gzip":      {},
@@ -39,6 +47,8 @@ var notGzippableTypes = map[string]struct{}{
 	"video/vp8":             {},
 	"video/webm":            {},
 }
+
+var gzipPool = sync.Pool{New: func() interface{} { return gzip.NewWriter(nil) }}
 
 // An Handler provides a clever gzip compressing handler.
 type Handler struct {
