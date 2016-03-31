@@ -129,6 +129,10 @@ func (cw *compressWriter) Write(b []byte) (int, error) {
 
 // close closes the gzip writer if it has been used.
 func (cw *compressWriter) close() {
+	if !cw.gzipDetect {
+		cw.writePostponedHeader()
+	}
+
 	if cw.gzipUse {
 		cw.gzipWriter.Close()
 	}
@@ -150,7 +154,9 @@ func isGzippable(cl int, ct string) bool {
 	if i := strings.IndexByte(ct, ';'); i >= 0 {
 		ct = ct[:i]
 	}
+
 	ct = strings.ToLower(ct)
+
 	_, ok := notGzippableTypes[ct]
 	return !ok
 }

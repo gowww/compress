@@ -31,34 +31,34 @@ func TestGzipWriteHeader(t *testing.T) {
 }
 
 func testGzip(t *testing.T, writeHeader bool) {
-	type testCase struct {
+	cases := []*struct {
 		needsGzip bool
 		content   []byte
-	}
-	var cc []*testCase
-	for _, c := range []struct {
-		gzippableType bool
-		contentPrefix []byte
 	}{
+		{false, []byte("")},
+		{false, []byte("x")},
 		{false, []byte("%PDF-")},
-		{true, []byte("<!DOCTYPE HTML>")},
-	} {
-		// Small content
-		cc = append(cc, &testCase{false, c.contentPrefix})
-		// Big content
-		b := append(c.contentPrefix, make([]byte, gzippableMinSize)...)
-		cc = append(cc, &testCase{c.gzippableType, b})
+		{false, []byte("<!DOCTYPE HTML>")},
+		{true, addGzippableMinSize([]byte(""))},
+		{true, addGzippableMinSize([]byte("x"))},
+		{false, addGzippableMinSize([]byte("%PDF-"))},
+		{true, addGzippableMinSize([]byte("<!DOCTYPE HTML>"))},
+	}
+
+	status := http.StatusOK
+	if writeHeader {
+		status = http.StatusTeapot
 	}
 
 	ts := httptest.NewServer(HandleFunc(func(w http.ResponseWriter, r *http.Request) {
 		if writeHeader {
-			w.WriteHeader(http.StatusOK)
+			w.WriteHeader(status)
 		}
 		io.Copy(w, r.Body)
 	}))
 	defer ts.Close()
 
-	for _, c := range cc {
+	for _, c := range cases {
 		req, err := http.NewRequest("POST", ts.URL, bytes.NewReader(c.content))
 		if err != nil {
 			t.Fatal(err)
@@ -70,6 +70,10 @@ func testGzip(t *testing.T, writeHeader bool) {
 			t.Fatal(err)
 		}
 
+		if writeHeader && res.StatusCode != status {
+			t.Errorf("%v bytes %q: write header call: want %v, got %v", len(c.content), res.Header.Get("Content-Type"), status, res.StatusCode)
+		}
+
 		ce := res.Header.Get("Content-Encoding")
 		if c.needsGzip && ce != "gzip" {
 			t.Errorf("%v bytes %q needs gzip", len(c.content), res.Header.Get("Content-Type"))
@@ -77,4 +81,8 @@ func testGzip(t *testing.T, writeHeader bool) {
 			t.Errorf("%v bytes %q doesn't need gzip", len(c.content), res.Header.Get("Content-Type"))
 		}
 	}
+}
+
+func addGzippableMinSize(b []byte) []byte {
+	return append(b, make([]byte, gzippableMinSize)...)
 }
