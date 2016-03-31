@@ -1,8 +1,10 @@
-package compress
+package compress_test
 
 import (
 	"fmt"
 	"net/http"
+
+	"github.com/gowww/compress"
 )
 
 func Example() {
@@ -12,7 +14,7 @@ func Example() {
 		fmt.Fprint(w, "Response is gzipped when content is long enough.")
 	})
 
-	http.ListenAndServe(":8080", Handle(mux))
+	http.ListenAndServe(":8080", compress.Handle(mux))
 }
 
 func ExampleHandle() {
@@ -22,11 +24,11 @@ func ExampleHandle() {
 		fmt.Fprint(w, "Response is gzipped when content is long enough.")
 	})
 
-	http.ListenAndServe(":8080", Handle(mux))
+	http.ListenAndServe(":8080", compress.Handle(mux))
 }
 
 func ExampleHandleFunc() {
-	http.Handle("/", HandleFunc(func(w http.ResponseWriter, r *http.Request) {
+	http.Handle("/", compress.HandleFunc(func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprint(w, "Response is gzipped when content is long enough.")
 	}))
 
