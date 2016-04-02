@@ -110,23 +110,40 @@ func (cw *compressWriter) writePostponedHeader() {
 // Otherwise, it calls the original Write method.
 func (cw *compressWriter) Write(b []byte) (int, error) {
 	if !cw.gzipDetect {
-		cl, _ := strconv.Atoi(cw.ResponseWriter.Header().Get("Content-Length"))
-		if cl <= 0 {
-			cl = len(b) // If no Content-Length, take the length of this first chunk.
+		// Check content is not already encoded.
+		if cw.ResponseWriter.Header().Get("Content-Encoding") != "" {
+			goto NoGzipUse
 		}
 
-		ct := cw.ResponseWriter.Header().Get("Content-Type")
-		if ct == "" {
+		// Check content has sufficient length.
+		if cl, _ := strconv.Atoi(cw.ResponseWriter.Header().Get("Content-Length")); cl <= 0 {
+			// If no Content-Length, take the length of this first chunk.
+			if len(b) < gzippableMinSize {
+				goto NoGzipUse
+			}
+		}
+
+		// Check content is of gzippable type.
+		if ct := cw.ResponseWriter.Header().Get("Content-Type"); ct == "" {
 			ct = http.DetectContentType(b)
 			cw.ResponseWriter.Header().Set("Content-Type", ct)
+
+			if i := strings.IndexByte(ct, ';'); i >= 0 {
+				ct = ct[:i]
+			}
+			ct = strings.ToLower(ct)
+
+			if _, ok := notGzippableTypes[ct]; ok {
+				goto NoGzipUse
+			}
 		}
 
-		if isGzippable(cl, ct) {
-			cw.gzipUse = true
-			cw.setGzipHeaders()
-			cw.gzipWriter.Reset(cw.ResponseWriter)
-		}
+		cw.ResponseWriter.Header().Del("Content-Length") // Because the compressed content will have a new length.
+		cw.ResponseWriter.Header().Set("Content-Encoding", "gzip")
+		cw.gzipWriter.Reset(cw.ResponseWriter)
+		cw.gzipUse = true
 
+	NoGzipUse:
 		cw.writePostponedHeader()
 		cw.gzipDetect = true
 	}
@@ -146,27 +163,4 @@ func (cw *compressWriter) close() {
 	if cw.gzipUse {
 		cw.gzipWriter.Close()
 	}
-}
-
-// setGzipHeaders sets the Content-Encoding header for a gzip response.
-// Because the compressed content will have a new size, it also removes the Content-Length header as it could have been set downstream by another handler.
-func (cw *compressWriter) setGzipHeaders() {
-	cw.ResponseWriter.Header().Del("Content-Length")
-	cw.ResponseWriter.Header().Set("Content-Encoding", "gzip")
-}
-
-// isGzippable checks if a content must be compressed following its content length (cl) and content type (ct).
-func isGzippable(cl int, ct string) bool {
-	if cl < gzippableMinSize || ct == "" {
-		return false
-	}
-
-	if i := strings.IndexByte(ct, ';'); i >= 0 {
-		ct = ct[:i]
-	}
-
-	ct = strings.ToLower(ct)
-
-	_, ok := notGzippableTypes[ct]
-	return !ok
 }
