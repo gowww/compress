@@ -98,12 +98,11 @@ func (cw *compressWriter) WriteHeader(status int) {
 	cw.status = status
 }
 
-// writePostponedHeader writes the response header with the cached status code.
+// writePostponedHeader writes the response header when a cached status code exists.
 func (cw *compressWriter) writePostponedHeader() {
-	if cw.status == 0 {
-		cw.status = http.StatusOK
+	if cw.status > 0 {
+		cw.ResponseWriter.WriteHeader(cw.status)
 	}
-	cw.ResponseWriter.WriteHeader(cw.status)
 }
 
 // Write sets the compressing headers and calls the gzip writer, but only if the Content-Type header defines a compressible content.
