@@ -83,7 +83,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	h.Next.ServeHTTP(cw, r)
 }
 
-// compressWriter binds the downstream repsonse writing into gzipWriter if the first content is detected as gzippable.
+// compressWriter binds the downstream response writing into gzipWriter if the first content is detected as gzippable.
 type compressWriter struct {
 	http.ResponseWriter
 	gzipWriter *gzip.Writer
