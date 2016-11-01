@@ -50,26 +50,26 @@ var notGzippableTypes = map[string]struct{}{
 
 var gzipPool = sync.Pool{New: func() interface{} { return gzip.NewWriter(nil) }}
 
-// An Handler provides a clever gzip compressing handler.
-type Handler struct {
-	Next http.Handler
+// A handler provides a clever gzip compressing handler.
+type handler struct {
+	next http.Handler
 }
 
 // Handle returns a Handler wrapping another http.Handler.
-func Handle(h http.Handler) *Handler {
-	return &Handler{h}
+func Handle(h http.Handler) http.Handler {
+	return &handler{h}
 }
 
 // HandleFunc returns a Handler wrapping an http.HandlerFunc.
-func HandleFunc(f http.HandlerFunc) *Handler {
+func HandleFunc(f http.HandlerFunc) http.Handler {
 	return Handle(f)
 }
 
-func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Add("Vary", "Accept-Encoding")
 
 	if !strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") || r.Header.Get("Sec-WebSocket-Key") != "" {
-		h.Next.ServeHTTP(w, r)
+		h.next.ServeHTTP(w, r)
 		return
 	}
 
@@ -80,7 +80,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	defer gzipPool.Put(cw.gzipWriter)
 	defer cw.close()
 
-	h.Next.ServeHTTP(cw, r)
+	h.next.ServeHTTP(cw, r)
 }
 
 // compressWriter binds the downstream response writing into gzipWriter if the first content is detected as gzippable.
