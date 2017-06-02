@@ -120,7 +120,7 @@ func (cw *compressWriter) Write(b []byte) (int, error) {
 		// Check content has sufficient length.
 		cl, _ = strconv.Atoi(cw.ResponseWriter.Header().Get("Content-Length"))
 		if cl <= 0 {
-			cl = len(b) // FIXME: Cache the first 512 bytes to be sure to detect content length correctly.
+			cl = len(b) // FIXME: Cache the first gzippableMinSize bytes to be sure to detect content length correctly.
 		}
 		if cl < gzippableMinSize {
 			goto GzipChecked
