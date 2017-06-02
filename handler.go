@@ -119,9 +119,8 @@ func (cw *compressWriter) Write(b []byte) (int, error) {
 
 		// Check content has sufficient length.
 		cl, _ = strconv.Atoi(cw.ResponseWriter.Header().Get("Content-Length"))
-		// If no Content-Length, take the length of the first provided chunk.
 		if cl <= 0 {
-			cl = len(b)
+			cl = len(b) // FIXME: Cache the first 512 bytes to be sure to detect content length correctly.
 		}
 		if cl < gzippableMinSize {
 			goto GzipChecked
@@ -130,7 +129,7 @@ func (cw *compressWriter) Write(b []byte) (int, error) {
 		// Check content is of gzippable type.
 		ct = cw.ResponseWriter.Header().Get("Content-Type")
 		if ct == "" {
-			ct = http.DetectContentType(b)
+			ct = http.DetectContentType(b) // FIXME: Cache the first 512 bytes to be sure to detect content type correctly.
 			cw.ResponseWriter.Header().Set("Content-Type", ct)
 		}
 		if i := strings.IndexByte(ct, ';'); i >= 0 {
