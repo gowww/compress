@@ -51,6 +51,7 @@ func test(tc *testCase) {
 		if errs := tc.test(c, res); len(errs) > 0 {
 			for _, err := range errs {
 				tc.t.Errorf("%v bytes %q: %v", len(c.body), res.Header.Get("Content-Type"), err)
+				// tc.t.Log(string(c.body))
 			}
 		}
 	}
@@ -74,7 +75,6 @@ func TestGzipAcceptance(t *testing.T) {
 
 func TestResponseAlreadyEncoded(t *testing.T) {
 	encoding := "otherThanGzip"
-
 	test(&testCase{
 		t:              t,
 		acceptEncoding: "gzip",
@@ -111,7 +111,6 @@ func TestGzip(t *testing.T) {
 
 func TestGzipWriteHeader(t *testing.T) {
 	status := http.StatusTeapot
-
 	test(&testCase{
 		t:              t,
 		acceptEncoding: "gzip",

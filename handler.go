@@ -9,9 +9,9 @@ Make sure to include this handler above any other handler that alter the respons
 package compress
 
 import (
+	"bytes"
 	"compress/gzip"
 	"net/http"
-	"strconv"
 	"strings"
 	"sync"
 )
@@ -67,19 +67,17 @@ func HandleFunc(f http.HandlerFunc) http.Handler {
 
 func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Add("Vary", "Accept-Encoding")
-
 	if !strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") || r.Header.Get("Sec-WebSocket-Key") != "" {
 		h.next.ServeHTTP(w, r)
 		return
 	}
-
 	cw := &compressWriter{
 		ResponseWriter: w,
 		gzipWriter:     gzipPool.Get().(*gzip.Writer),
+		firstBytes:     new(bytes.Buffer),
 	}
 	defer gzipPool.Put(cw.gzipWriter)
 	defer cw.close()
-
 	h.next.ServeHTTP(cw, r)
 }
 
@@ -87,19 +85,20 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 type compressWriter struct {
 	http.ResponseWriter
 	gzipWriter  *gzip.Writer
+	firstBytes  *bytes.Buffer
+	status      int  // status is the buffered response status in case WriteHeader has been called downstream.
 	gzipChecked bool // gzipChecked tells if the gzippable checking has been done.
 	gzipUsed    bool // gzipUse tells if gzip is used for the response.
-	status      int
 }
 
-// WriteHeader catches a downstream WriteHeader call and caches the status code.
+// WriteHeader catches a downstream WriteHeader call and buffers the status code.
 // The header will be written later, at the first Write call, after the gzipping checking has been done.
 func (cw *compressWriter) WriteHeader(status int) {
 	cw.status = status
 }
 
-// writePostponedHeader writes the response header when a cached status code exists.
-func (cw *compressWriter) writePostponedHeader() {
+// writeBufferedHeader writes the response header when a buffered status code exists.
+func (cw *compressWriter) writeBufferedHeader() {
 	if cw.status > 0 {
 		cw.ResponseWriter.WriteHeader(cw.status)
 	}
@@ -108,60 +107,61 @@ func (cw *compressWriter) writePostponedHeader() {
 // Write sets the compressing headers and calls the gzip writer, but only if the Content-Type header defines a compressible content.
 // Otherwise, it calls the original Write method.
 func (cw *compressWriter) Write(b []byte) (int, error) {
-	if !cw.gzipChecked {
-		var ct string
-		var cl int
-
-		// Check content is not already encoded.
-		if cw.ResponseWriter.Header().Get("Content-Encoding") != "" {
-			goto GzipChecked
+	if cw.gzipChecked {
+		if cw.gzipUsed {
+			return cw.gzipWriter.Write(b)
 		}
-
-		// Check content has sufficient length.
-		cl, _ = strconv.Atoi(cw.ResponseWriter.Header().Get("Content-Length"))
-		if cl <= 0 {
-			cl = len(b) // FIXME: Cache the first gzippableMinSize bytes to be sure to detect content length correctly.
-		}
-		if cl < gzippableMinSize {
-			goto GzipChecked
-		}
-
-		// Check content is of gzippable type.
-		ct = cw.ResponseWriter.Header().Get("Content-Type")
-		if ct == "" {
-			ct = http.DetectContentType(b) // FIXME: Cache the first 512 bytes to be sure to detect content type correctly.
-			cw.ResponseWriter.Header().Set("Content-Type", ct)
-		}
-		if i := strings.IndexByte(ct, ';'); i >= 0 {
-			ct = ct[:i]
-		}
-		ct = strings.ToLower(ct)
-		if _, ok := notGzippableTypes[ct]; ok {
-			goto GzipChecked
-		}
-
-		cw.ResponseWriter.Header().Del("Content-Length") // Because the compressed content will have a new length.
-		cw.ResponseWriter.Header().Set("Content-Encoding", "gzip")
-		cw.gzipWriter.Reset(cw.ResponseWriter)
-		cw.gzipUsed = true
-
-	GzipChecked:
-		cw.writePostponedHeader()
-		cw.gzipChecked = true
+		return cw.ResponseWriter.Write(b)
 	}
 
-	if cw.gzipUsed {
-		return cw.gzipWriter.Write(b)
+	if cw.ResponseWriter.Header().Get("Content-Encoding") != "" { // Content is already encoded.
+		cw.gzipCheckingDone()
+		return cw.ResponseWriter.Write(b)
 	}
-	return cw.ResponseWriter.Write(b)
+
+	if cw.firstBytes.Len()+len(b) < gzippableMinSize { // Still insufficient content length to determine gzippability: buffer these first bytes.
+		return cw.firstBytes.Write(b)
+	}
+
+	ct := cw.ResponseWriter.Header().Get("Content-Type")
+	if ct == "" {
+		ct = http.DetectContentType(append(cw.firstBytes.Bytes(), b...))
+		cw.ResponseWriter.Header().Set("Content-Type", ct)
+	}
+	if i := strings.IndexByte(ct, ';'); i >= 0 {
+		ct = ct[:i]
+	}
+	ct = strings.ToLower(ct)
+	if _, ok := notGzippableTypes[ct]; ok {
+		cw.gzipCheckingDone()
+		return cw.ResponseWriter.Write(b)
+	}
+
+	cw.ResponseWriter.Header().Del("Content-Length") // Because the compressed content will have a new length.
+	cw.ResponseWriter.Header().Set("Content-Encoding", "gzip")
+	cw.gzipWriter.Reset(cw.ResponseWriter)
+	cw.gzipUsed = true
+	cw.gzipCheckingDone()
+	return cw.gzipWriter.Write(b)
 }
 
-// close closes the gzip writer if it has been used.
+// gzipCheckingDone writes the buffered data (status and firstBytes) sets the gzipChecked flag to true.
+func (cw *compressWriter) gzipCheckingDone() {
+	cw.writeBufferedHeader()
+	if cw.gzipUsed {
+		cw.firstBytes.WriteTo(cw.gzipWriter)
+	} else {
+		cw.firstBytes.WriteTo(cw.ResponseWriter)
+	}
+	cw.gzipChecked = true
+}
+
+// close writes the buffered data (status and firstBytes) if it has not been done yet and closes the gzip writer if it has been used.
 func (cw *compressWriter) close() {
 	if !cw.gzipChecked {
-		cw.writePostponedHeader()
+		cw.writeBufferedHeader()
+		cw.firstBytes.WriteTo(cw.ResponseWriter)
 	}
-
 	if cw.gzipUsed {
 		cw.gzipWriter.Close()
 	}
