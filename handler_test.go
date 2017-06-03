@@ -28,12 +28,12 @@ var testableContents = []*testableContent{
 type testCase struct {
 	t              *testing.T
 	acceptEncoding string
-	f              http.HandlerFunc
+	handler        http.HandlerFunc
 	test           func(*testableContent, *http.Response) []string
 }
 
 func test(tc *testCase) {
-	ts := httptest.NewServer(HandleFunc(tc.f))
+	ts := httptest.NewServer(HandleFunc(tc.handler))
 	defer ts.Close()
 
 	for _, c := range testableContents {
@@ -51,7 +51,6 @@ func test(tc *testCase) {
 		if errs := tc.test(c, res); len(errs) > 0 {
 			for _, err := range errs {
 				tc.t.Errorf("%v bytes %q: %v", len(c.body), res.Header.Get("Content-Type"), err)
-				// tc.t.Log(string(c.body))
 			}
 		}
 	}
@@ -61,7 +60,7 @@ func TestGzipAcceptance(t *testing.T) {
 	test(&testCase{
 		t:              t,
 		acceptEncoding: "otherThanGzip",
-		f: func(w http.ResponseWriter, r *http.Request) {
+		handler: func(w http.ResponseWriter, r *http.Request) {
 			io.Copy(w, r.Body)
 		},
 		test: func(_ *testableContent, res *http.Response) (errs []string) {
@@ -78,7 +77,7 @@ func TestResponseAlreadyEncoded(t *testing.T) {
 	test(&testCase{
 		t:              t,
 		acceptEncoding: "gzip",
-		f: func(w http.ResponseWriter, r *http.Request) {
+		handler: func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Encoding", encoding)
 			io.Copy(w, r.Body)
 		},
@@ -95,7 +94,7 @@ func TestGzip(t *testing.T) {
 	test(&testCase{
 		t:              t,
 		acceptEncoding: "gzip",
-		f: func(w http.ResponseWriter, r *http.Request) {
+		handler: func(w http.ResponseWriter, r *http.Request) {
 			io.Copy(w, r.Body)
 		},
 		test: func(c *testableContent, res *http.Response) (errs []string) {
@@ -114,9 +113,10 @@ func TestGzipWriteHeader(t *testing.T) {
 	test(&testCase{
 		t:              t,
 		acceptEncoding: "gzip",
-		f: func(w http.ResponseWriter, r *http.Request) {
+		handler: func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(status)
 			io.Copy(w, r.Body)
+			w.Write(nil) // Use Write when cw.gzipChecked.
 		},
 		test: func(c *testableContent, res *http.Response) (errs []string) {
 			if res.StatusCode != status {
