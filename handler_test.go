@@ -3,6 +3,7 @@ package compress
 import (
 	"bytes"
 	"fmt"
+	// "golang.org/x/net/http2"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -25,6 +26,10 @@ var testableContents = []*testableContent{
 	{true, addGzippableMinSize([]byte("<!DOCTYPE HTML>"))},
 }
 
+func addGzippableMinSize(b []byte) []byte {
+	return append(b, make([]byte, gzippableMinSize)...)
+}
+
 type testCase struct {
 	t              *testing.T
 	acceptEncoding string
@@ -37,13 +42,12 @@ func test(tc *testCase) {
 	defer ts.Close()
 
 	for _, c := range testableContents {
-		req, err := http.NewRequest("POST", ts.URL, bytes.NewReader(c.body))
+		req, err := http.NewRequest("GET", ts.URL, bytes.NewReader(c.body))
 		if err != nil {
 			tc.t.Fatal(err)
 		}
 		req.Header.Set("Accept-Encoding", tc.acceptEncoding)
-
-		res, err := new(http.Client).Do(req)
+		res, err := http.DefaultClient.Do(req)
 		if err != nil {
 			tc.t.Fatal(err)
 		}
@@ -125,8 +129,4 @@ func TestGzipWriteHeader(t *testing.T) {
 			return
 		},
 	})
-}
-
-func addGzippableMinSize(b []byte) []byte {
-	return append(b, make([]byte, gzippableMinSize)...)
 }

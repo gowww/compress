@@ -145,6 +145,25 @@ func (cw *compressWriter) Write(b []byte) (int, error) {
 	return cw.gzipWriter.Write(b)
 }
 
+// Push initiates an HTTP/2 server push with an Accept-Encoding header.
+// See net/http.Pusher for documentation.
+func (cw *compressWriter) Push(target string, opts *http.PushOptions) error {
+	pusher, ok := cw.ResponseWriter.(http.Pusher)
+	if !ok {
+		return http.ErrNotSupported
+	}
+	if opts == nil {
+		opts = new(http.PushOptions)
+	}
+	if opts.Header == nil {
+		opts.Header = make(http.Header)
+	}
+	if enc := opts.Header.Get("Accept-Encoding"); enc == "" {
+		opts.Header.Add("Accept-Encoding", "gzip")
+	}
+	return pusher.Push(target, opts)
+}
+
 // gzipCheckingDone writes the buffered data (status and firstBytes) sets the gzipChecked flag to true.
 func (cw *compressWriter) gzipCheckingDone() {
 	cw.writeBufferedHeader()
