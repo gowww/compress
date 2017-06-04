@@ -13,7 +13,7 @@ Make sure to include this handler above any other handler that alter the respons
 mux := http.NewServeMux()
 
 mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-    fmt.Fprint(w, "Response is gzipped when content is long enough.")
+	fmt.Fprint(w, "Response is gzipped when content is long enough.")
 })
 
 http.ListenAndServe(":8080", compress.Handle(mux))
