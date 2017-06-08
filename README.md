@@ -27,7 +27,7 @@ To wrap an [http.Handler](https://golang.org/pkg/net/http/#Handler), use [Handle
 mux := http.NewServeMux()
 
 mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprint(w, "Response is gzipped when content is long enough.")
+	fmt.Fprint(w, "Hello")
 })
 
 http.ListenAndServe(":8080", compress.Handle(handler))
@@ -37,7 +37,7 @@ To wrap an [http.HandlerFunc](https://golang.org/pkg/net/http/#HandlerFunc), use
 
 ```Go
 http.Handle("/", compress.HandleFunc(func(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprint(w, "Response is gzipped when content is long enough.")
+	fmt.Fprint(w, "Hello")
 }))
 
 http.ListenAndServe(":8080", nil)
