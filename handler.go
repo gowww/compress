@@ -1,11 +1,4 @@
-/*
-Package compress provides a clever gzip compressing handler.
-
-It takes care to not handle small contents, or contents that are already compressed (like JPEG, MPEG or PDF).
-Trying to gzip them not only wastes CPU but can potentially increase the response size.
-
-Make sure to include this handler above any other handler that alter the response body.
-*/
+// Package compress provides a clever gzip compressing handler.
 package compress
 
 import (

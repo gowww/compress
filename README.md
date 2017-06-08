@@ -5,9 +5,23 @@ Package [compress](https://godoc.org/github.com/gowww/compress) provides a cleve
 It takes care to not handle small contents, or contents that are already compressed (like JPEG, MPEG or PDF).
 Trying to gzip them not only wastes CPU but can potentially increase the response size.
 
-Make sure to include this handler above any other handler that alter the response body.
+## Installing
 
-## Example
+1. Get package:
+
+	```Shell
+	go get -u github.com/gowww/compress
+	````
+
+2. Import it in your code:
+
+	```Go
+	import "github.com/gowww/compress"
+	```
+
+## Usage
+
+To wrap an [http.Handler](https://golang.org/pkg/net/http/#Handler), use [Handle](https://godoc.org/github.com/gowww/compress#Handle):
 
 ```Go
 mux := http.NewServeMux()
@@ -16,5 +30,17 @@ mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprint(w, "Response is gzipped when content is long enough.")
 })
 
-http.ListenAndServe(":8080", compress.Handle(mux))
+http.ListenAndServe(":8080", compress.Handle(handler))
 ````
+
+To wrap an [http.HandlerFunc](https://golang.org/pkg/net/http/#HandlerFunc), use [Handle](https://godoc.org/github.com/gowww/compress#Handle):
+
+```Go
+http.Handle("/", compress.HandleFunc(func(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprint(w, "Response is gzipped when content is long enough.")
+}))
+
+http.ListenAndServe(":8080", nil)
+```
+
+All in all, make sure to include this handler above any other handler that may write the response.
