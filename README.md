@@ -33,7 +33,7 @@ mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 http.ListenAndServe(":8080", compress.Handle(handler))
 ````
 
-To wrap an [http.HandlerFunc](https://golang.org/pkg/net/http/#HandlerFunc), use [HandlerFunc](https://godoc.org/github.com/gowww/compress#HandlerFunc):
+To wrap an [http.HandlerFunc](https://golang.org/pkg/net/http/#HandlerFunc), use [HandleFunc](https://godoc.org/github.com/gowww/compress#HandleFunc):
 
 ```Go
 http.Handle("/", compress.HandleFunc(func(w http.ResponseWriter, r *http.Request) {
