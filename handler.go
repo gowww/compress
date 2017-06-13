@@ -2,8 +2,10 @@
 package compress
 
 import (
+	"bufio"
 	"bytes"
 	"compress/gzip"
+	"net"
 	"net/http"
 	"strings"
 	"sync"
@@ -138,10 +140,39 @@ func (cw *compressWriter) Write(b []byte) (int, error) {
 	return cw.gzipWriter.Write(b)
 }
 
-// Push initiates an HTTP/2 server push with an Accept-Encoding header.
-// See net/http.Pusher for documentation.
+// CloseNotify implements the http.CloseNotifier interface.
+// No channel is returned if CloseNotify is not implemented by an upstream response writer.
+func (cw *compressWriter) CloseNotify() <-chan bool {
+	n, ok := cw.ResponseWriter.(http.CloseNotifier)
+	if !ok {
+		return nil
+	}
+	return n.CloseNotify()
+}
+
+// Flush implements the http.Flusher interface.
+// Nothing is done if Flush is not implemented by an upstream response writer.
+func (cw *compressWriter) Flush() {
+	f, ok := cw.ResponseWriter.(http.Flusher)
+	if ok {
+		f.Flush()
+	}
+}
+
+// Hijack implements the http.Hijacker interface.
+// Error http.ErrNotSupported is returned if Hijack is not implemented by an upstream response writer.
+func (cw *compressWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	h, ok := cw.ResponseWriter.(http.Hijacker)
+	if !ok {
+		return nil, nil, http.ErrNotSupported
+	}
+	return h.Hijack()
+}
+
+// Push implements the http.Pusher interface.
+// http.ErrNotSupported is returned if Push is not implemented by an upstream response writer or not supported by the client.
 func (cw *compressWriter) Push(target string, opts *http.PushOptions) error {
-	pusher, ok := cw.ResponseWriter.(http.Pusher)
+	p, ok := cw.ResponseWriter.(http.Pusher)
 	if !ok {
 		return http.ErrNotSupported
 	}
@@ -154,7 +185,7 @@ func (cw *compressWriter) Push(target string, opts *http.PushOptions) error {
 	if enc := opts.Header.Get("Accept-Encoding"); enc == "" {
 		opts.Header.Add("Accept-Encoding", "gzip")
 	}
-	return pusher.Push(target, opts)
+	return p.Push(target, opts)
 }
 
 // gzipCheckingDone writes the buffered data (status and firstBytes) sets the gzipChecked flag to true.
