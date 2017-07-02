@@ -11,7 +11,7 @@ Trying to gzip them not only wastes CPU but can potentially increase the respons
 
 	```Shell
 	go get -u github.com/gowww/compress
-	````
+	```
 
 2. Import it in your code:
 
@@ -31,7 +31,7 @@ mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 })
 
 http.ListenAndServe(":8080", compress.Handle(handler))
-````
+```
 
 To wrap an [http.HandlerFunc](https://golang.org/pkg/net/http/#HandlerFunc), use [HandleFunc](https://godoc.org/github.com/gowww/compress#HandleFunc):
 
