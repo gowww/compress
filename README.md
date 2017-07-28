@@ -2,7 +2,7 @@
 
 Package [compress](https://godoc.org/github.com/gowww/compress) provides a clever gzip compressing handler.
 
-It takes care to not handle small contents, or contents that are already compressed (like JPEG, MPEG or PDF).
+It takes care to not handle small contents, or contents that are already compressed (like JPEG, MPEG or PDF).  
 Trying to gzip them not only wastes CPU but can potentially increase the response size.
 
 ## Installing
