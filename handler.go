@@ -194,7 +194,7 @@ func (cw *compressWriter) Push(target string, opts *http.PushOptions) error {
 	return p.Push(target, opts)
 }
 
-// gzipCheckingDone writes the buffered data (status and firstBytes) sets the gzipChecked flag to true.
+// gzipCheckingDone writes the buffered data (status and firstBytes) and sets the gzipChecked flag to true.
 func (cw *compressWriter) gzipCheckingDone() {
 	cw.writeBufferedHeader()
 	if cw.gzipUsed {
